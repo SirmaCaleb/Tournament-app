@@ -630,7 +630,8 @@ function FixturesScreen({ sport, groupData }) {
 
       <Panel>
         <SectionTitle small>Standings</SectionTitle>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 340 }}>
           <thead>
             <tr style={{ borderBottom: `2px solid ${TOKENS.ink}`, textAlign: "left" }}>
               <th style={thStyle}>#</th>
@@ -647,9 +648,9 @@ function FixturesScreen({ sport, groupData }) {
             {standings.map((row, i) => (
               <tr key={row.team} style={{ borderBottom: `1px solid ${TOKENS.line}`, background: i === 0 ? "#E9F0E4" : "transparent" }}>
                 <td style={tdStyle}>{i + 1}</td>
-                <td style={{ ...tdStyle, fontWeight: 600 }}>
+                <td style={{ ...tdStyle, fontWeight: 600, maxWidth: 120, wordBreak: "break-word" }}>
                   {row.team}
-                  {i === 0 && <span style={{ marginLeft: 8, fontSize: 11, color: TOKENS.green, fontWeight: 700 }}>ADVANCES</span>}
+                  {i === 0 && <span style={{ display: "block", fontSize: 10, color: TOKENS.green, fontWeight: 700 }}>ADVANCES</span>}
                 </td>
                 <td style={tdStyleR}>{row.p}</td>
                 <td style={tdStyleR}>{row.w}</td>
@@ -661,6 +662,7 @@ function FixturesScreen({ sport, groupData }) {
             ))}
           </tbody>
         </table>
+        </div>
       </Panel>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginTop: 12 }}>
@@ -881,7 +883,7 @@ const ghostIconBtn = {
   lineHeight: 1,
 };
 
-const thStyle = { padding: "8px 6px", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.4, color: "#5B6B57" };
+const thStyle = { padding: "6px 4px", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, color: "#5B6B57" };
 const thStyleR = { ...thStyle, textAlign: "right" };
-const tdStyle = { padding: "9px 6px" };
+const tdStyle = { padding: "8px 4px", fontSize: 12.5 };
 const tdStyleR = { ...tdStyle, textAlign: "right" };
