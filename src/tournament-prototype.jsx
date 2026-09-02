@@ -546,15 +546,15 @@ function AdminFixtureRow({ f }) {
         <span style={{ fontSize: 12, color: "#7C8A78", marginLeft: 8 }}>{f.date}</span>
       </div>
       <input
-        type="number" min="0" value={home}
-        onChange={(e) => setHome(e.target.value)}
+        type="text" inputMode="numeric" pattern="[0-9]*" value={home}
+        onChange={(e) => setHome(e.target.value.replace(/[^0-9]/g, ""))}
         style={{ ...inputStyle, padding: "6px 8px", textAlign: "center" }}
         placeholder="0"
       />
       <span style={{ textAlign: "center", color: "#9AA396", fontWeight: 700 }}>-</span>
       <input
-        type="number" min="0" value={away}
-        onChange={(e) => setAway(e.target.value)}
+        type="text" inputMode="numeric" pattern="[0-9]*" value={away}
+        onChange={(e) => setAway(e.target.value.replace(/[^0-9]/g, ""))}
         style={{ ...inputStyle, padding: "6px 8px", textAlign: "center" }}
         placeholder="0"
       />
