@@ -7,7 +7,14 @@ import { Trophy, ChevronRight, ChevronLeft, Check, Upload, MapPin, Calendar, Shi
    Registration -> Fixtures & Standings
 --------------------------------------------------------- */
 
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');`;
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+* { box-sizing: border-box; }
+body { margin: 0; }
+@media (max-width: 600px) {
+  .hide-mobile { display: none !important; }
+  .stack-mobile { flex-direction: column !important; }
+  .full-mobile { width: 100% !important; }
+}`;
 
 const TOKENS = {
   ink: "#16241C",
@@ -122,7 +129,7 @@ export default function TournamentPrototype() {
 
       <TopBar sport={sport} setSport={setSport} screen={screen} setScreen={setScreen} />
 
-      <main style={{ maxWidth: 980, margin: "0 auto", padding: "28px 20px 80px" }}>
+      <main style={{ maxWidth: 980, margin: "0 auto", padding: "16px 12px 80px" }}>
         {screen === "register" ? (
           <RegisterFlow sport={sport} />
         ) : screen === "admin" ? (
@@ -144,27 +151,27 @@ function TopBar({ sport, setSport, screen, setScreen }) {
     <header style={{ background: TOKENS.ink, color: TOKENS.surface }}>
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "18px 20px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Trophy size={22} color={TOKENS.gold} strokeWidth={2} />
+          <Trophy size={22} color={TOKENS.gold} strokeWidth={2} style={{ flexShrink: 0 }} />
           <div>
             <div
               style={{
                 fontFamily: "'Big Shoulders Display', sans-serif",
                 fontWeight: 800,
-                fontSize: 26,
+                fontSize: "clamp(16px, 4vw, 26px)",
                 letterSpacing: 0.3,
                 lineHeight: 1,
               }}
             >
               ELGEYO MARAKWET WARD GAMES
             </div>
-            <div style={{ fontSize: 12.5, color: "#B9C4B6", marginTop: 3 }}>
+            <div style={{ fontSize: 11, color: "#B9C4B6", marginTop: 3 }}>
               County-wide ward tournament · Football · Volleyball · Handball
             </div>
           </div>
         </div>
 
         {/* Sport switcher */}
-        <div style={{ display: "flex", gap: 4, marginTop: 20 }}>
+        <div style={{ display: "flex", gap: 2, marginTop: 16, overflowX: "auto" }}>
           {SPORTS.map((s) => (
             <button
               key={s}
@@ -174,11 +181,12 @@ function TopBar({ sport, setSport, screen, setScreen }) {
                 color: sport === s ? TOKENS.ink : "#C9D2C4",
                 border: "none",
                 borderRadius: "8px 8px 0 0",
-                padding: "9px 20px",
+                padding: "9px 14px",
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontWeight: 600,
-                fontSize: 14.5,
+                fontSize: 13,
                 cursor: "pointer",
+                whiteSpace: "nowrap",
               }}
             >
               {s}
@@ -189,7 +197,7 @@ function TopBar({ sport, setSport, screen, setScreen }) {
 
       {/* Screen switcher */}
       <div style={{ background: TOKENS.surface, borderTop: `3px solid ${TOKENS.gold}` }}>
-        <div style={{ maxWidth: 980, margin: "0 auto", padding: "12px 20px", display: "flex", gap: 8 }}>
+        <div style={{ maxWidth: 980, margin: "0 auto", padding: "10px 12px", display: "flex", gap: 6, overflowX: "auto" }}>
           <SegButton active={screen === "register"} onClick={() => setScreen("register")} icon={<Shield size={15} />}>
             Register a team
           </SegButton>
@@ -212,16 +220,18 @@ function SegButton({ active, onClick, children, icon }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 7,
+        gap: 6,
         background: active ? TOKENS.ink : "transparent",
         color: active ? TOKENS.surface : TOKENS.ink,
         border: `1.5px solid ${TOKENS.ink}`,
         borderRadius: 7,
-        padding: "8px 16px",
+        padding: "7px 12px",
         fontWeight: 600,
-        fontSize: 13.5,
+        fontSize: 12.5,
         cursor: "pointer",
         fontFamily: "'IBM Plex Sans', sans-serif",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
       }}
     >
       {icon}
@@ -358,10 +368,9 @@ function RegisterFlow({ sport }) {
               secured once this step is submitted.
             </p>
             {players.map((p, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 70px 32px", gap: 8, marginBottom: 8, alignItems: "center" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 60px 32px", gap: 6, marginBottom: 8, alignItems: "center" }}>
                 <input placeholder="Player name" value={p.name} onChange={(e) => updatePlayer(i, "name", e.target.value)} style={inputStyle} />
-                <input placeholder="Date of birth" value={p.dob} onChange={(e) => updatePlayer(i, "dob", e.target.value)} style={inputStyle} />
-                <input placeholder="National ID" value={p.idNo} onChange={(e) => updatePlayer(i, "idNo", e.target.value)} style={inputStyle} />
+                <input placeholder="ID / DOB" value={p.dob} onChange={(e) => updatePlayer(i, "dob", e.target.value)} style={inputStyle} />
                 <input placeholder="No." value={p.jersey} onChange={(e) => updatePlayer(i, "jersey", e.target.value)} style={inputStyle} />
                 <button onClick={() => removePlayer(i)} disabled={players.length === 1} style={{ ...ghostIconBtn, opacity: players.length === 1 ? 0.3 : 1 }}>
                   ×
@@ -538,39 +547,42 @@ function AdminFixtureRow({ f }) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 52px 16px 52px auto", gap: 8, alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${TOKENS.line}` }}>
-      <div style={{ fontSize: 13.5 }}>
+    <div style={{ padding: "10px 0", borderBottom: `1px solid ${TOKENS.line}` }}>
+      <div style={{ fontSize: 13.5, marginBottom: 8 }}>
         <span style={{ fontWeight: 600 }}>{f.home}</span>
         <span style={{ color: "#9AA396", margin: "0 6px" }}>vs</span>
         <span style={{ fontWeight: 600 }}>{f.away}</span>
         <span style={{ fontSize: 12, color: "#7C8A78", marginLeft: 8 }}>{f.date}</span>
       </div>
-      <input
-        type="text" inputMode="numeric" pattern="[0-9]*" value={home}
-        onChange={(e) => setHome(e.target.value.replace(/[^0-9]/g, ""))}
-        style={{ ...inputStyle, padding: "6px 8px", textAlign: "center" }}
-        placeholder="0"
-      />
-      <span style={{ textAlign: "center", color: "#9AA396", fontWeight: 700 }}>-</span>
-      <input
-        type="text" inputMode="numeric" pattern="[0-9]*" value={away}
-        onChange={(e) => setAway(e.target.value.replace(/[^0-9]/g, ""))}
-        style={{ ...inputStyle, padding: "6px 8px", textAlign: "center" }}
-        placeholder="0"
-      />
-      <button
-        onClick={save}
-        disabled={saving || home === "" || away === ""}
-        style={{
-          ...primaryBtnStyle,
-          padding: "7px 14px",
-          fontSize: 13,
-          background: saved ? TOKENS.green : TOKENS.ink,
-          opacity: home === "" || away === "" ? 0.4 : 1,
-        }}
-      >
-        {saved ? <Check size={14} /> : saving ? "..." : "Save"}
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input
+          type="text" inputMode="numeric" pattern="[0-9]*" value={home}
+          onChange={(e) => setHome(e.target.value.replace(/[^0-9]/g, ""))}
+          style={{ ...inputStyle, width: 60, padding: "8px", textAlign: "center", flexShrink: 0 }}
+          placeholder="0"
+        />
+        <span style={{ color: "#9AA396", fontWeight: 700 }}>-</span>
+        <input
+          type="text" inputMode="numeric" pattern="[0-9]*" value={away}
+          onChange={(e) => setAway(e.target.value.replace(/[^0-9]/g, ""))}
+          style={{ ...inputStyle, width: 60, padding: "8px", textAlign: "center", flexShrink: 0 }}
+          placeholder="0"
+        />
+        <button
+          onClick={save}
+          disabled={saving || home === "" || away === ""}
+          style={{
+            ...primaryBtnStyle,
+            padding: "8px 16px",
+            fontSize: 13,
+            background: saved ? TOKENS.green : TOKENS.ink,
+            opacity: home === "" || away === "" ? 0.4 : 1,
+            marginLeft: "auto",
+          }}
+        >
+          {saved ? <Check size={14} /> : saving ? "..." : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -586,27 +598,29 @@ function FixturesScreen({ sport, groupData }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
-        <h2 style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontSize: 28, fontWeight: 800, margin: 0 }}>
+      <div style={{ marginBottom: 12 }}>
+        <h2 style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, margin: "0 0 2px" }}>
           {sport} — group stage
         </h2>
-        <span style={{ fontSize: 13, color: "#5B6B57" }}>Shared venue: Iten County Stadium Grounds</span>
+        <span style={{ fontSize: 12, color: "#5B6B57" }}>Iten County Stadium Grounds</span>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto" }}>
         {Object.keys(GROUPS).map((g) => (
           <button
             key={g}
             onClick={() => setActiveGroup(g)}
             style={{
-              padding: "7px 18px",
+              padding: "7px 14px",
               borderRadius: 20,
               border: `1.5px solid ${TOKENS.ink}`,
               background: activeGroup === g ? TOKENS.ink : "transparent",
               color: activeGroup === g ? TOKENS.surface : TOKENS.ink,
               fontWeight: 700,
-              fontSize: 13.5,
+              fontSize: 13,
               cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             Group {g}
@@ -649,7 +663,7 @@ function FixturesScreen({ sport, groupData }) {
         </table>
       </Panel>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginTop: 12 }}>
         <Panel>
           <SectionTitle small>Recent results</SectionTitle>
           {results.length === 0 && <EmptyNote>No matches played yet in this group.</EmptyNote>}
@@ -689,7 +703,7 @@ function KnockoutBracket({ sport, groupData }) {
   return (
     <Panel style={{ marginTop: 16 }}>
       <SectionTitle small>Path to the {sport} final</SectionTitle>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto 1fr", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto 1fr", alignItems: "center", gap: 8, overflowX: "auto" }}>
         {/* Semifinal 1 */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#7C8A78", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Semifinal 1</div>
