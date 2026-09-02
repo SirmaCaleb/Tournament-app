@@ -1,0 +1,741 @@
+﻿import React, { useState, useMemo, useEffect } from "react";
+import { supabase } from "./supabaseClient";
+import { Trophy, ChevronRight, ChevronLeft, Check, Upload, MapPin, Calendar, Shield } from "lucide-react";
+
+/* ---------------------------------------------------------
+   Elgeyo Marakwet County Sports Tournament — prototype
+   Registration -> Fixtures & Standings
+--------------------------------------------------------- */
+
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');`;
+
+const TOKENS = {
+  ink: "#16241C",
+  surface: "#EEF0E4",
+  panel: "#F7F8F1",
+  gold: "#C98A2B",
+  green: "#3C6E4F",
+  red: "#A6473F",
+  line: "#D6D8C6",
+  lineDark: "#3A4A3D",
+};
+
+const SPORTS = ["Football", "Volleyball", "Handball"];
+
+const GROUPS = {
+  A: ["Emsoo", "Kaptarakwa", "Sengwer", "Embobut/Embolot", "Tambach"],
+  B: ["Kabiemit", "Cherangany/Chebororwa", "Endo", "Kamariny", "Chepkorio"],
+  C: ["Moiben/Kuserwo", "Kapyego", "Kapchemutwa", "Metkei", "Kapsowar"],
+  D: ["Sambirir", "Soy South", "Lelan", "Soy North", "Arror"],
+};
+
+function buildGroupData(rows) {
+  const data = {};
+  Object.entries(GROUPS).forEach(([g, teams]) => {
+    const fixtures = rows
+      .filter((r) => r.group_name === g)
+      .map((r) => ({
+        id: r.id,
+        home: r.home,
+        away: r.away,
+        played: r.played,
+        homeScore: r.home_score,
+        awayScore: r.away_score,
+        date: r.date,
+        time: r.time,
+      }));
+    data[g] = { fixtures, teams };
+  });
+  return data;
+}
+
+function computeStandings(fixtures, teams) {
+  const table = {};
+  teams.forEach((t) => (table[t] = { team: t, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }));
+  fixtures
+    .filter((f) => f.played)
+    .forEach((f) => {
+      const h = table[f.home];
+      const a = table[f.away];
+      h.p++; a.p++;
+      h.gf += f.homeScore; h.ga += f.awayScore;
+      a.gf += f.awayScore; a.ga += f.homeScore;
+      if (f.homeScore > f.awayScore) { h.w++; a.l++; h.pts += 3; }
+      else if (f.homeScore < f.awayScore) { a.w++; h.l++; a.pts += 3; }
+      else { h.d++; a.d++; h.pts += 1; a.pts += 1; }
+    });
+  return Object.values(table).sort(
+    (x, y) => y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf
+  );
+}
+
+const ALL_WARDS = Object.values(GROUPS).flat();
+
+function wardGroup(ward) {
+  return Object.entries(GROUPS).find(([, list]) => list.includes(ward))?.[0];
+}
+
+export default function TournamentPrototype() {
+  const [screen, setScreen] = useState("register");
+  const [sport, setSport] = useState("Football");
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchFixtures() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("fixtures")
+        .select("*")
+        .eq("sport", sport);
+      if (error) console.error("Supabase error:", error.message);
+      console.log("Fetched rows:", data);
+      setRows(data || []);
+      setLoading(false);
+    }
+    fetchFixtures();
+
+    const channel = supabase
+      .channel("fixtures-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "fixtures", filter: `sport=eq.${sport}` },
+        (payload) => {
+          setRows((prev) => {
+            if (payload.eventType === "INSERT") return [...prev, payload.new];
+            if (payload.eventType === "UPDATE") return prev.map((r) => r.id === payload.new.id ? payload.new : r);
+            if (payload.eventType === "DELETE") return prev.filter((r) => r.id !== payload.old.id);
+            return prev;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [sport]);
+
+  const groupData = useMemo(() => buildGroupData(rows), [rows]);
+
+  return (
+    <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", background: TOKENS.surface, minHeight: "100vh", color: TOKENS.ink }}>
+      <style>{FONT_IMPORT}</style>
+
+      <TopBar sport={sport} setSport={setSport} screen={screen} setScreen={setScreen} />
+
+      <main style={{ maxWidth: 980, margin: "0 auto", padding: "28px 20px 80px" }}>
+        {screen === "register" ? (
+          <RegisterFlow sport={sport} />
+        ) : loading ? (
+          <div style={{ textAlign: "center", padding: 60, color: "#7C8A78" }}>Loading fixtures…</div>
+        ) : (
+          <FixturesScreen sport={sport} groupData={groupData} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function TopBar({ sport, setSport, screen, setScreen }) {
+  return (
+    <header style={{ background: TOKENS.ink, color: TOKENS.surface }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "18px 20px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Trophy size={22} color={TOKENS.gold} strokeWidth={2} />
+          <div>
+            <div
+              style={{
+                fontFamily: "'Big Shoulders Display', sans-serif",
+                fontWeight: 800,
+                fontSize: 26,
+                letterSpacing: 0.3,
+                lineHeight: 1,
+              }}
+            >
+              ELGEYO MARAKWET WARD GAMES
+            </div>
+            <div style={{ fontSize: 12.5, color: "#B9C4B6", marginTop: 3 }}>
+              County-wide ward tournament · Football · Volleyball · Handball
+            </div>
+          </div>
+        </div>
+
+        {/* Sport switcher */}
+        <div style={{ display: "flex", gap: 4, marginTop: 20 }}>
+          {SPORTS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSport(s)}
+              style={{
+                background: sport === s ? TOKENS.surface : "transparent",
+                color: sport === s ? TOKENS.ink : "#C9D2C4",
+                border: "none",
+                borderRadius: "8px 8px 0 0",
+                padding: "9px 20px",
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontWeight: 600,
+                fontSize: 14.5,
+                cursor: "pointer",
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Screen switcher */}
+      <div style={{ background: TOKENS.surface, borderTop: `3px solid ${TOKENS.gold}` }}>
+        <div style={{ maxWidth: 980, margin: "0 auto", padding: "12px 20px", display: "flex", gap: 8 }}>
+          <SegButton active={screen === "register"} onClick={() => setScreen("register")} icon={<Shield size={15} />}>
+            Register a team
+          </SegButton>
+          <SegButton active={screen === "fixtures"} onClick={() => setScreen("fixtures")} icon={<Calendar size={15} />}>
+            Fixtures &amp; standings
+          </SegButton>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function SegButton({ active, onClick, children, icon }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 7,
+        background: active ? TOKENS.ink : "transparent",
+        color: active ? TOKENS.surface : TOKENS.ink,
+        border: `1.5px solid ${TOKENS.ink}`,
+        borderRadius: 7,
+        padding: "8px 16px",
+        fontWeight: 600,
+        fontSize: 13.5,
+        cursor: "pointer",
+        fontFamily: "'IBM Plex Sans', sans-serif",
+      }}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
+/* ------------------------- REGISTRATION ------------------------- */
+
+const STEPS = ["Team details", "Squad list", "Entry fee", "Review"];
+
+function RegisterFlow({ sport }) {
+  const [step, setStep] = useState(0);
+  const [ward, setWard] = useState("");
+  const [manager, setManager] = useState("");
+  const [phone, setPhone] = useState("");
+  const [players, setPlayers] = useState([{ name: "", dob: "", idNo: "", jersey: "" }]);
+  const [submitted, setSubmitted] = useState(false);
+
+  const squadCap = sport === "Football" ? 18 : sport === "Handball" ? 12 : 12;
+  const group = ward ? wardGroup(ward) : null;
+
+  function updatePlayer(i, field, value) {
+    setPlayers((p) => p.map((row, idx) => (idx === i ? { ...row, [field]: value } : row)));
+  }
+  function addPlayer() {
+    if (players.length < squadCap) setPlayers((p) => [...p, { name: "", dob: "", idNo: "", jersey: "" }]);
+  }
+  function removePlayer(i) {
+    setPlayers((p) => p.filter((_, idx) => idx !== i));
+  }
+
+  const canAdvance = [
+    ward && manager && phone,
+    players.filter((p) => p.name).length >= 5,
+    true,
+    true,
+  ];
+
+  if (submitted) {
+    return (
+      <Panel>
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div
+            style={{
+              width: 56, height: 56, borderRadius: "50%", background: TOKENS.green,
+              display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px",
+            }}
+          >
+            <Check color="#fff" size={28} />
+          </div>
+          <h2 style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontSize: 28, fontWeight: 800, margin: "0 0 8px" }}>
+            Registration submitted
+          </h2>
+          <p style={{ color: "#48584B", fontSize: 15, maxWidth: 460, margin: "0 auto 4px" }}>
+            {ward} Ward's {sport} team is in the review queue. The county sports office will verify your squad
+            and payment before confirming your place in Group {group}.
+          </p>
+          <p style={{ color: "#7C8A78", fontSize: 13.5, marginTop: 14 }}>
+            Registration ref: EMC-{sport.slice(0, 2).toUpperCase()}-{Math.floor(1000 + Math.random() * 9000)}
+          </p>
+          <button
+            onClick={() => { setSubmitted(false); setStep(0); setWard(""); setManager(""); setPhone(""); setPlayers([{ name: "", dob: "", idNo: "", jersey: "" }]); }}
+            style={primaryBtnStyle}
+          >
+            Register another team
+          </button>
+        </div>
+      </Panel>
+    );
+  }
+
+  return (
+    <div>
+      {/* Step indicator — genuinely sequential, so numbering is warranted */}
+      <div style={{ display: "flex", marginBottom: 22 }}>
+        {STEPS.map((label, i) => (
+          <div key={label} style={{ flex: 1, textAlign: "center", position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <div style={{ flex: i === 0 ? 0 : 1, height: 2, background: i <= step ? TOKENS.gold : TOKENS.line }} />
+              <div
+                style={{
+                  width: 30, height: 30, borderRadius: "50%",
+                  background: i <= step ? TOKENS.ink : "#fff",
+                  border: `2px solid ${i <= step ? TOKENS.ink : TOKENS.line}`,
+                  color: i <= step ? TOKENS.surface : "#9AA396",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 700, fontSize: 13, flexShrink: 0,
+                }}
+              >
+                {i < step ? <Check size={15} /> : i + 1}
+              </div>
+              <div style={{ flex: i === STEPS.length - 1 ? 0 : 1, height: 2, background: i < step ? TOKENS.gold : TOKENS.line }} />
+            </div>
+            <div style={{ fontSize: 12, marginTop: 6, color: i <= step ? TOKENS.ink : "#9AA396", fontWeight: i === step ? 600 : 500 }}>
+              {label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Panel>
+        {step === 0 && (
+          <div>
+            <SectionTitle>Team details — {sport}</SectionTitle>
+            <Field label="Ward">
+              <select value={ward} onChange={(e) => setWard(e.target.value)} style={inputStyle}>
+                <option value="">Select your ward</option>
+                {ALL_WARDS.map((w) => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+            </Field>
+            {ward && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, color: TOKENS.green, fontSize: 13.5, marginTop: -8, marginBottom: 16 }}>
+                <MapPin size={14} /> Assigned to Group {group} for the {sport} group stage
+              </div>
+            )}
+            <Field label="Team manager / coach name">
+              <input value={manager} onChange={(e) => setManager(e.target.value)} style={inputStyle} placeholder="Full name" />
+            </Field>
+            <Field label="Manager phone number">
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} placeholder="07XX XXX XXX" />
+            </Field>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div>
+            <SectionTitle>Squad list — {players.length}/{squadCap} players</SectionTitle>
+            <p style={{ fontSize: 13.5, color: "#5B6B57", marginTop: -6, marginBottom: 16 }}>
+              Add at least 5 players to continue. You can finish the full squad later — the ward's slot is
+              secured once this step is submitted.
+            </p>
+            {players.map((p, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 70px 32px", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                <input placeholder="Player name" value={p.name} onChange={(e) => updatePlayer(i, "name", e.target.value)} style={inputStyle} />
+                <input placeholder="Date of birth" value={p.dob} onChange={(e) => updatePlayer(i, "dob", e.target.value)} style={inputStyle} />
+                <input placeholder="National ID" value={p.idNo} onChange={(e) => updatePlayer(i, "idNo", e.target.value)} style={inputStyle} />
+                <input placeholder="No." value={p.jersey} onChange={(e) => updatePlayer(i, "jersey", e.target.value)} style={inputStyle} />
+                <button onClick={() => removePlayer(i)} disabled={players.length === 1} style={{ ...ghostIconBtn, opacity: players.length === 1 ? 0.3 : 1 }}>
+                  ×
+                </button>
+              </div>
+            ))}
+            <button onClick={addPlayer} disabled={players.length >= squadCap} style={dashedBtnStyle}>
+              + Add player
+            </button>
+
+            <div style={{ marginTop: 22, borderTop: `1px solid ${TOKENS.line}`, paddingTop: 16 }}>
+              <SectionTitle small>Documents</SectionTitle>
+              <div style={{ display: "flex", gap: 10 }}>
+                <UploadTile label="Player ID copies (.zip or .pdf)" />
+                <UploadTile label="Team photo" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div>
+            <SectionTitle>Entry fee</SectionTitle>
+            <div style={{ background: TOKENS.panel, border: `1px solid ${TOKENS.line}`, borderRadius: 10, padding: 18, marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14.5, marginBottom: 8 }}>
+                <span>{sport} team entry fee</span>
+                <strong>KSh 3,000</strong>
+              </div>
+              <div style={{ fontSize: 12.5, color: "#5B6B57" }}>
+                One-off fee per ward per sport. Covers the full group stage plus knockout, if the team qualifies.
+              </div>
+            </div>
+            <Field label="Pay via M-Pesa — Paybill">
+              <div style={{ display: "flex", gap: 10 }}>
+                <input style={{ ...inputStyle, flex: 1 }} value="4521190" disabled />
+                <input style={{ ...inputStyle, flex: 1 }} placeholder="M-Pesa transaction code" />
+              </div>
+            </Field>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div>
+            <SectionTitle>Review before submitting</SectionTitle>
+            <ReviewRow label="Sport" value={sport} />
+            <ReviewRow label="Ward" value={ward || "—"} />
+            <ReviewRow label="Group" value={group ? `Group ${group}` : "—"} />
+            <ReviewRow label="Manager" value={manager || "—"} />
+            <ReviewRow label="Phone" value={phone || "—"} />
+            <ReviewRow label="Players added" value={`${players.filter((p) => p.name).length} of ${squadCap}`} />
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 26, borderTop: `1px solid ${TOKENS.line}`, paddingTop: 18 }}>
+          <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} style={{ ...secondaryBtnStyle, opacity: step === 0 ? 0.4 : 1 }}>
+            <ChevronLeft size={16} /> Back
+          </button>
+          {step < STEPS.length - 1 ? (
+            <button onClick={() => setStep((s) => s + 1)} disabled={!canAdvance[step]} style={{ ...primaryBtnStyle, opacity: canAdvance[step] ? 1 : 0.4 }}>
+              Continue <ChevronRight size={16} />
+            </button>
+          ) : (
+            <button onClick={() => setSubmitted(true)} style={primaryBtnStyle}>
+              Submit registration
+            </button>
+          )}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function UploadTile({ label }) {
+  return (
+    <div style={{ flex: 1, border: `1.5px dashed ${TOKENS.line}`, borderRadius: 8, padding: "18px 12px", textAlign: "center", color: "#7C8A78" }}>
+      <Upload size={18} style={{ marginBottom: 6 }} />
+      <div style={{ fontSize: 12.5 }}>{label}</div>
+    </div>
+  );
+}
+
+function ReviewRow({ label, value }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${TOKENS.line}`, fontSize: 14.5 }}>
+      <span style={{ color: "#5B6B57" }}>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+/* ------------------------- FIXTURES / STANDINGS ------------------------- */
+
+function FixturesScreen({ sport, groupData }) {
+  const [activeGroup, setActiveGroup] = useState("A");
+  const data = groupData[activeGroup];
+  const standings = computeStandings(data.fixtures, data.teams);
+  const upcoming = data.fixtures.filter((f) => !f.played).slice(0, 4);
+  const results = data.fixtures.filter((f) => f.played);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+        <h2 style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontSize: 28, fontWeight: 800, margin: 0 }}>
+          {sport} — group stage
+        </h2>
+        <span style={{ fontSize: 13, color: "#5B6B57" }}>Shared venue: Iten County Stadium Grounds</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+        {Object.keys(GROUPS).map((g) => (
+          <button
+            key={g}
+            onClick={() => setActiveGroup(g)}
+            style={{
+              padding: "7px 18px",
+              borderRadius: 20,
+              border: `1.5px solid ${TOKENS.ink}`,
+              background: activeGroup === g ? TOKENS.ink : "transparent",
+              color: activeGroup === g ? TOKENS.surface : TOKENS.ink,
+              fontWeight: 700,
+              fontSize: 13.5,
+              cursor: "pointer",
+            }}
+          >
+            Group {g}
+          </button>
+        ))}
+      </div>
+
+      <Panel>
+        <SectionTitle small>Standings</SectionTitle>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+          <thead>
+            <tr style={{ borderBottom: `2px solid ${TOKENS.ink}`, textAlign: "left" }}>
+              <th style={thStyle}>#</th>
+              <th style={thStyle}>Ward</th>
+              <th style={thStyleR}>P</th>
+              <th style={thStyleR}>W</th>
+              <th style={thStyleR}>D</th>
+              <th style={thStyleR}>L</th>
+              <th style={thStyleR}>GD</th>
+              <th style={thStyleR}>Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {standings.map((row, i) => (
+              <tr key={row.team} style={{ borderBottom: `1px solid ${TOKENS.line}`, background: i === 0 ? "#E9F0E4" : "transparent" }}>
+                <td style={tdStyle}>{i + 1}</td>
+                <td style={{ ...tdStyle, fontWeight: 600 }}>
+                  {row.team}
+                  {i === 0 && <span style={{ marginLeft: 8, fontSize: 11, color: TOKENS.green, fontWeight: 700 }}>ADVANCES</span>}
+                </td>
+                <td style={tdStyleR}>{row.p}</td>
+                <td style={tdStyleR}>{row.w}</td>
+                <td style={tdStyleR}>{row.d}</td>
+                <td style={tdStyleR}>{row.l}</td>
+                <td style={tdStyleR}>{row.gf - row.ga > 0 ? `+${row.gf - row.ga}` : row.gf - row.ga}</td>
+                <td style={{ ...tdStyleR, fontWeight: 700 }}>{row.pts}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+        <Panel>
+          <SectionTitle small>Recent results</SectionTitle>
+          {results.length === 0 && <EmptyNote>No matches played yet in this group.</EmptyNote>}
+          {results.map((f) => (
+            <MatchRow key={f.id} f={f} />
+          ))}
+        </Panel>
+        <Panel>
+          <SectionTitle small>Upcoming fixtures</SectionTitle>
+          {upcoming.length === 0 && <EmptyNote>All group matches are scheduled and played.</EmptyNote>}
+          {upcoming.map((f) => (
+            <MatchRow key={f.id} f={f} />
+          ))}
+        </Panel>
+      </div>
+
+      <KnockoutBracket sport={sport} groupData={groupData} />
+    </div>
+  );
+}
+
+function KnockoutBracket({ sport, groupData }) {
+  // Get top team from each group based on current standings
+  const winners = Object.entries(GROUPS).map(([g, teams]) => {
+    const standings = computeStandings(groupData[g]?.fixtures || [], teams);
+    const allGroupMatchesPlayed = groupData[g]?.fixtures.every((f) => f.played);
+    return {
+      group: g,
+      team: allGroupMatchesPlayed ? standings[0]?.team : null,
+    };
+  });
+
+  // SF1: Winner A vs Winner B, SF2: Winner C vs Winner D
+  const sf1 = [winners[0], winners[1]];
+  const sf2 = [winners[2], winners[3]];
+
+  return (
+    <Panel style={{ marginTop: 16 }}>
+      <SectionTitle small>Path to the {sport} final</SectionTitle>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto 1fr", alignItems: "center", gap: 12 }}>
+        {/* Semifinal 1 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#7C8A78", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Semifinal 1</div>
+          {sf1.map(({ group, team }) => (
+            <div key={group} style={{
+              padding: "9px 14px", borderRadius: 8, fontSize: 13.5, fontWeight: 600,
+              background: team ? TOKENS.ink : TOKENS.panel,
+              color: team ? TOKENS.surface : "#9AA396",
+              border: `1px solid ${team ? TOKENS.ink : TOKENS.line}`,
+            }}>
+              {team || `Winner Group ${group}`}
+            </div>
+          ))}
+        </div>
+
+        {/* Arrow */}
+        <ChevronRight size={20} color={TOKENS.gold} />
+
+        {/* Final */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: TOKENS.gold, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Final</div>
+          <div style={{
+            padding: "12px 18px", borderRadius: 8, fontSize: 14, fontWeight: 700,
+            background: TOKENS.gold, color: "#fff", textAlign: "center", width: "100%",
+            border: `2px solid ${TOKENS.gold}`,
+          }}>
+            <Trophy size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />
+            {sport} Final
+          </div>
+          <div style={{ fontSize: 12, color: "#7C8A78", textAlign: "center" }}>County Champion</div>
+        </div>
+
+        {/* Arrow */}
+        <ChevronLeft size={20} color={TOKENS.gold} />
+
+        {/* Semifinal 2 */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#7C8A78", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Semifinal 2</div>
+          {sf2.map(({ group, team }) => (
+            <div key={group} style={{
+              padding: "9px 14px", borderRadius: 8, fontSize: 13.5, fontWeight: 600,
+              background: team ? TOKENS.ink : TOKENS.panel,
+              color: team ? TOKENS.surface : "#9AA396",
+              border: `1px solid ${team ? TOKENS.ink : TOKENS.line}`,
+            }}>
+              {team || `Winner Group ${group}`}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: "#7C8A78", marginTop: 14 }}>
+        Group winners are confirmed once all group matches are played.
+      </div>
+    </Panel>
+  );
+}
+
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${TOKENS.line}`, fontSize: 13.5 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+        <span style={{ fontWeight: f.played ? 400 : 600 }}>{f.home}</span>
+        {f.played ? (
+          <span style={{ fontWeight: 700 }}>{f.homeScore} – {f.awayScore}</span>
+        ) : (
+          <span style={{ color: "#9AA396" }}>vs</span>
+        )}
+        <span style={{ fontWeight: f.played ? 400 : 600 }}>{f.away}</span>
+      </div>
+      <span style={{ color: "#7C8A78", fontSize: 12 }}>{f.date} · {f.time}</span>
+    </div>
+  );
+}
+
+function EmptyNote({ children }) {
+  return <div style={{ fontSize: 13, color: "#9AA396", padding: "10px 0" }}>{children}</div>;
+}
+
+/* ------------------------- shared bits ------------------------- */
+
+function Panel({ children, style }) {
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${TOKENS.line}`, borderRadius: 12, padding: 22, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ children, small }) {
+  return (
+    <h3
+      style={{
+        fontFamily: "'Big Shoulders Display', sans-serif",
+        fontWeight: 700,
+        fontSize: small ? 17 : 21,
+        margin: small ? "0 0 12px" : "0 0 18px",
+        color: TOKENS.ink,
+      }}
+    >
+      {children}
+    </h3>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6, color: "#3E4C3A" }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle = {
+  width: "100%",
+  padding: "9px 12px",
+  borderRadius: 7,
+  border: `1.5px solid ${TOKENS.line}`,
+  fontSize: 14,
+  fontFamily: "'IBM Plex Sans', sans-serif",
+  background: "#fff",
+  color: TOKENS.ink,
+  boxSizing: "border-box",
+};
+
+const primaryBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  background: TOKENS.ink,
+  color: TOKENS.surface,
+  border: "none",
+  borderRadius: 8,
+  padding: "10px 20px",
+  fontWeight: 700,
+  fontSize: 14,
+  cursor: "pointer",
+  fontFamily: "'IBM Plex Sans', sans-serif",
+};
+
+const secondaryBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  background: "transparent",
+  color: TOKENS.ink,
+  border: `1.5px solid ${TOKENS.line}`,
+  borderRadius: 8,
+  padding: "10px 18px",
+  fontWeight: 600,
+  fontSize: 14,
+  cursor: "pointer",
+  fontFamily: "'IBM Plex Sans', sans-serif",
+};
+
+const dashedBtnStyle = {
+  width: "100%",
+  border: `1.5px dashed ${TOKENS.line}`,
+  background: "transparent",
+  borderRadius: 8,
+  padding: "9px",
+  color: TOKENS.green,
+  fontWeight: 600,
+  fontSize: 13.5,
+  cursor: "pointer",
+  marginTop: 4,
+};
+
+const ghostIconBtn = {
+  border: "none",
+  background: "transparent",
+  color: TOKENS.red,
+  fontSize: 20,
+  cursor: "pointer",
+  lineHeight: 1,
+};
+
+const thStyle = { padding: "8px 6px", fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.4, color: "#5B6B57" };
+const thStyleR = { ...thStyle, textAlign: "right" };
+const tdStyle = { padding: "9px 6px" };
+const tdStyleR = { ...tdStyle, textAlign: "right" };

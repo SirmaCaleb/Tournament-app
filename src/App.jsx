@@ -1,0 +1,1 @@
+import TournamentPrototype from './tournament-prototype'; export default function App() { return <TournamentPrototype />; }
